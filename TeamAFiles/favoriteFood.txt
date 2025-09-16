@@ -1,6 +1,0 @@
-dog
-cat
-bat
-cheeseburger
-pizza
-nugget
