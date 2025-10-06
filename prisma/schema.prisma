@@ -11,16 +11,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("file:../db/dev.db")
-}
-
-model Reservation {
-  Reservation_id  Int       @id 
-  Room_id         String?        
-  Time_start      DateTime 
-  Time_end        DateTime
-
-  @@map("reservations")
+  url      = "file:../db/dev.sqlite"
 }
 
 model Room {
@@ -28,4 +19,17 @@ model Room {
   Room_name       String?   
   Capacity        Int
   Equipment       String?   
+
+  @@map("Rooms")
+  Reservation Reservation[]
+}
+
+model Reservation {
+  Reservation_id  Int       @id 
+  Room            Room      @relation(fields: [Room_id], references: [Room_id]) 
+  Room_id         String       
+  Time_start      DateTime 
+  Time_end        DateTime
+
+  @@map("Reservations")
 }
