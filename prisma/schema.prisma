@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -15,21 +14,21 @@ datasource db {
 }
 
 model Room {
-  Room_id         String    @id @unique
-  Room_name       String?   
-  Capacity        Int
-  Equipment       String?   
+  roomId         String     @map("room_id")  @id  
+  roomName       String?    @map("room_name")
+  capacity       Int        
+  Equipments     String?    @map("equipments")
 
   @@map("Rooms")
   Reservation Reservation[]
 }
 
 model Reservation {
-  Reservation_id  Int       @id 
-  Room            Room      @relation(fields: [Room_id], references: [Room_id]) 
-  Room_id         String       
-  Time_start      DateTime 
-  Time_end        DateTime
+  reservationId  Int        @map("reservation_id")  @id @default(autoincrement())
+  room            Room      @relation(fields: [roomId], references: [roomId]) 
+  roomId         String    @map("room_id") 
+  timeStart      DateTime  @map("time_start")
+  timeEnd        DateTime  @map("time_end")
 
   @@map("Reservations")
 }
