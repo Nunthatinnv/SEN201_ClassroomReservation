@@ -10,6 +10,22 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = env("file:../db/dev.db")
+}
+
+model Reservation {
+  Reservation_id  Int       @id 
+  Room_id         String?        
+  Time_start      DateTime 
+  Time_end        DateTime
+
+  @@map("reservations")
+}
+
+model Room {
+  Room_id         String    @id @unique
+  Room_name       String?   
+  Capacity        Int
+  Equipment       String?   
 }
