@@ -1,5 +1,5 @@
 /*
-	File: init.js
+	File: init.ts
 	Author: Win - Thanawin Pattanaphol (tpattan@cmkl.ac.th)
 	Description: Responsible for connecting to the SQLite database.
 	Date: 2025-10-06
