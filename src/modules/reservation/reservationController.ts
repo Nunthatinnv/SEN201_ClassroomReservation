@@ -1,10 +1,10 @@
 /*
-	File: reservationServices.ts
-	Author: Poon - Nunthatinn Veerapaiboon (nveerap@cmkl.ac.th)
-	Description: Main reservation logics
+  File: reservationController.ts
+  Author: Poon - Nunthatinn Veerapaiboon (nveerap@cmkl.ac.th)
+  Description: Main reservation logics
     - Conflicts check
-    - Recursively upsert reservation
-	Lasted Modify: 2025-10-07 17:14
+    - Recursively insert and edit reservations
+  Lasted Modify: 2025-10-14 22.03
 */
 
 import { PrismaClient } from "@prisma/client";
@@ -127,7 +127,7 @@ export async function addReservation(roomId: string, timeStart: Date, timeEnd: D
   }
 }
 
-
+// Edit existing reservations, grouped by seriesId
 export async function editReservation(seriesId: string, roomId: string, timeStart: Date, timeEnd: Date, rep: number, competency: string): Promise<boolean> {
   const slots = generateWeeklySlots(timeStart, timeEnd, rep);
   const isConflict = await checkConflicts(seriesId, roomId, slots);

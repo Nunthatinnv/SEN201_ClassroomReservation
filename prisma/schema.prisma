@@ -16,8 +16,8 @@ datasource db {
 model Room {
   roomId              String    @map("room_id")  @id  
   roomName            String?   @map("room_name")
-  capacity            Int        
-  Equipments          String?   @map("equipments")
+  capacity            Int
+  equipments          String?
 
   @@map("Rooms")
   Reservation Reservation[]
