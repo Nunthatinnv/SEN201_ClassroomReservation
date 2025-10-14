@@ -13,7 +13,9 @@ import type { Room } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// ----- ROOM CRUD -----
+// ---------- ROOM CRUD ----------
+
+// ---------- ROOM Create ----------
 
 // add a room to database
 export async function createRoom(data: { 
@@ -41,6 +43,10 @@ export async function createRoom(data: {
     }
 }
 
+
+
+// ---------- ROOM Read ----------
+
 // fetch all rooms
 export async function getAllRooms(): Promise<
     { success: true; rooms: Room[] } | { success: false; error: any }
@@ -56,6 +62,7 @@ export async function getAllRooms(): Promise<
     }
 }
 
+
 // get a room by roomId
 export async function getRoomById(roomId: string): Promise<
     { success: true; room: Room | null } | { success: false; error: any }
@@ -70,6 +77,10 @@ export async function getRoomById(roomId: string): Promise<
         return { success: false, error };
     }
 }
+
+
+
+// ---------- ROOM Update ----------
 
 // update a existing room by roomId
 export async function updateRoom(
@@ -92,6 +103,10 @@ export async function updateRoom(
         return { success: false, error };
     }
 }
+
+
+
+// ---------- ROOM Delete ----------
 
 // delete a existing room by roomId
 export async function deleteRoom(roomId: string): Promise<

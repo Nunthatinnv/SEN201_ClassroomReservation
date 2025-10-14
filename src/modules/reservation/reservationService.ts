@@ -14,7 +14,9 @@ import type { SlotData } from "../types";
 
 const prisma = new PrismaClient();
 
-// ----- RESERVATION CRUD -----
+// ---------- RESERVATION CRUD ----------
+
+// ---------- RESERVATION Create ----------
 
 // create reservations with slots data
 export async function createReservationBySlotData(slotData: SlotData[]): Promise<
@@ -32,6 +34,10 @@ export async function createReservationBySlotData(slotData: SlotData[]): Promise
         return { success: false, error };
     }
 }
+
+
+
+// ---------- RESERVATION Read ----------
 
 // get a group of reservations by seriesId 
 export async function getReservationsBySeriesId(seriesId: string): Promise<
@@ -59,6 +65,7 @@ export async function getReservationsBySeriesId(seriesId: string): Promise<
 }
 
 
+// get all reservations by within input time range, optional filter by roomId
 export async function getReservationsByTimeRange(roomId: string | null, startTime: Date, endTime: Date): Promise<
     { success: true; reservations: Reservation[] } | { success: false; error: any }
 > {
@@ -90,6 +97,15 @@ export async function getReservationsByTimeRange(roomId: string | null, startTim
   }
 }
 
+
+
+// ---------- RESERVATION Update ----------
+// placeholder
+
+
+
+// ---------- RESERVATION Delete ----------
+
 // delete a existing reservation
 export async function deleteReservationById(reservationId: number): Promise<
     { success: true; reservation: Reservation } | { success: false; error: any }
@@ -114,6 +130,7 @@ export async function deleteReservationById(reservationId: number): Promise<
         };
     }
 }
+
 
 // delete a group of reservations by seriesId
 export async function deleteReservationBySeriesId(seriesId: string): Promise<
