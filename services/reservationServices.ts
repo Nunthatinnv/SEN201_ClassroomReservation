@@ -8,6 +8,7 @@
 */
 
 import { PrismaClient } from "@prisma/client";
+import { randomUUID } from "crypto";
 
 const prisma = new PrismaClient()
 // use `prisma` in your application to read and write data in your DB
@@ -20,14 +21,6 @@ type Slot = {
   timeEnd: Date;
 };
 
-type CheckConflictArgs = {
-    reservationId?: number | null;
-    roomId: string;
-    timeStart: Date;
-    timeEnd: Date;
-    rep: number;
-};
-
 
 // Helper: check time overlap
 function isOverlap(startA: Date, endA: Date, startB: Date, endB: Date): boolean {
@@ -37,37 +30,29 @@ function isOverlap(startA: Date, endA: Date, startB: Date, endB: Date): boolean 
 
 // Generate repeated weekly slots
 function generateWeeklySlots(timeStart: Date, timeEnd: Date, rep: number): Slot[] {
-    const slots: Slot[] = [];
+  const slots: Slot[] = [];
 
-    // Convert input strings to Date objects
-    let currentStart = timeStart;
-    let currentEnd = timeEnd;
+  // Convert input strings to Date objects
+  let currentStart = timeStart;
+  let currentEnd = timeEnd;
 
-    for (let i = 0; i < rep; i++) {
-      slots.push({
-        timeStart: currentStart,
-        timeEnd: currentEnd,
-      });
+  for (let i = 0; i < rep; i++) {
+    slots.push({
+      timeStart: currentStart,
+      timeEnd: currentEnd,
+    });
 
-      // Increment date by 7 days
-      currentStart = new Date(currentStart.getTime() + WEEK_MS);
-      currentEnd   = new Date(currentEnd.getTime()   + WEEK_MS);
-    }
+    // Increment date by 7 days
+    currentStart = new Date(currentStart.getTime() + WEEK_MS);
+    currentEnd   = new Date(currentEnd.getTime()   + WEEK_MS);
+  }
 
-    return slots;
+  return slots;
 }
 
 
-// Check conflicts
-export async function checkConflicts({
-  reservationId = null,
-  roomId,
-  timeStart,
-  timeEnd,
-  rep = 1
-}: CheckConflictArgs): Promise<boolean> {
-  const slots = generateWeeklySlots(timeStart, timeEnd, rep);
-
+// Check conflicts on given time slots
+async function checkConflicts(seriesId: string | null, roomId: string, slots: Slot[]): Promise<boolean> {
   try {
     const reservationsOnSlotDates = await prisma.reservation.findMany({
       where: {
@@ -89,24 +74,92 @@ export async function checkConflicts({
       const slotEnd = slot.timeEnd;
 
       for (const res of reservationsOnSlotDates) {
-        // Skip itself if editing an existing reservation
-        if (reservationId && res.reservationId === reservationId) continue;
+        // Skip itself series if editing an existing reservation
+        if (seriesId && res.seriesId === seriesId) continue;
 
         const resStart = res.timeStart;
         const resEnd = res.timeEnd;
 
         // Check for real overlap using helper function
         if (isOverlap(slotStart, slotEnd, resStart, resEnd)) {
-          throw new Error(
-            `Conflict detected: Room ${roomId} already booked from ${res.timeStart} to ${res.timeEnd}`
-          );
+          console.error(`Conflict detected: Room ${roomId} already booked from ${res.timeStart} to ${res.timeEnd}`);
+          return true; // conflicts found
         }
       }
     }
 
-    return true; // no conflicts
+    return false; // no conflicts
   } catch (error) {
     console.error('Error in checkConflicts:', error);
     throw error;
   }
 }
+
+
+// Adding reservation to database
+export async function addReservation(roomId: string, timeStart: Date, timeEnd: Date, rep: number, competency: string): Promise<boolean> {
+  const slots = generateWeeklySlots(timeStart, timeEnd, rep);
+  const isConflict = await checkConflicts(null, roomId, slots);
+
+  if (isConflict) {
+    // slot(s) overlap, reservation fail
+    return false;
+  } else {
+    // Insert slots into database
+    const seriesId = randomUUID();
+    const slotData = slots.map(slot => ({
+      seriesId,
+      roomId,
+      timeStart: slot.timeStart,
+      timeEnd: slot.timeEnd,
+      competency,
+    }));
+    try {
+      await prisma.reservation.createMany({
+        data: slotData
+      });
+      console.log("Reservations created successfully");
+      return true;
+    } catch (error) {
+      console.error('Error inserting reservations:', error);
+      return false;
+    }
+  }
+}
+
+
+export async function editReservation(seriesId: string, roomId: string, timeStart: Date, timeEnd: Date, rep: number, competency: string): Promise<boolean> {
+  const slots = generateWeeklySlots(timeStart, timeEnd, rep);
+  const isConflict = await checkConflicts(seriesId, roomId, slots);
+
+  if (isConflict) {
+    // slot(s) overlap, reservation fail
+    return false;
+  } else {
+    // Insert slots into database
+    const seriesId = randomUUID();
+    const slotData = slots.map(slot => ({
+      seriesId,
+      roomId,
+      timeStart: slot.timeStart,
+      timeEnd: slot.timeEnd,
+      competency,
+    }));
+    try {
+      await prisma.reservation.deleteMany({
+        where: {
+          seriesId: seriesId
+        }
+      });
+      await prisma.reservation.createMany({
+        data: slotData
+      });
+      console.log("Reservations edited successfully");
+      return true;
+    } catch (error) {
+      console.error('Error inserting reservations:', error);
+      return false;
+    }
+  }
+}
+
