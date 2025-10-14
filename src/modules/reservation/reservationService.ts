@@ -3,33 +3,30 @@
 	Author: Win - Thanawin Pattanaphol (tpattan@cmkl.ac.th)
     Edited by: Poon - Nunthatinn Veerapaiboon (nveerap@cmkl.ac.th)
 	Description: Reservation CRUD & businss logic
-	Lasted Modify: 2025-10-14 22.03
+	Lasted Modify: 2025-10-14 23.08
 
 	License: GNU General Public License Version 3.0
 */
 
 import { PrismaClient } from "@prisma/client";
-import type { Room, Reservation } from "@prisma/client";
+import type { Reservation } from "@prisma/client";
+import type { SlotData } from "../types";
 
 const prisma = new PrismaClient();
 
 // ----- RESERVATION CRUD -----
 
-// create a reservation with input data
-export async function createReservation(data: { 
-    seriesId: string, 
-    roomId: string; 
-    timeStart: Date; 
-    timeEnd: Date; 
-    competency: string; 
-}): Promise<
-    { success: true; reservation: Reservation } | { success: false; error: any }
+// create reservations with slots data
+export async function createReservationBySlotData(slotData: SlotData[]): Promise<
+    { success: true; created: number } | { success: false; error: any }
 > {
-        console.log('createReservation called with:', data);
+    console.log('createReservation called with:', slotData);
     try {
-        const result = await prisma.reservation.create({ data });
-            console.log('Reservation created:', result);
-        return { success: true, reservation: result };
+        const result = await prisma.reservation.createMany({
+            data: slotData,
+        });
+        console.log('Reservation created:', result);
+        return { success: true, created: result.count };
     } catch (error) {
         console.error('Error creating reservation:', error);
         return { success: false, error };
@@ -62,10 +59,36 @@ export async function getReservationsBySeriesId(seriesId: string): Promise<
 }
 
 
-// export async function updateReservation(reservationId: number, data: { timeStart?: Date; timeEnd?: Date; competency?: string; roomId?: string; seriesId?: string; }): Promise<any> {
-//     return await prisma.reservation.update({ where: { reservationId }, data });
-// }
+export async function getReservationsByTimeRange(roomId: string | null, startTime: Date, endTime: Date): Promise<
+    { success: true; reservations: Reservation[] } | { success: false; error: any }
+> {
+  console.log('getReservationsByTimeRange called with:', { startTime, endTime });
 
+  try {
+    const result = await prisma.reservation.findMany({
+      where: {
+        ...(roomId ? { roomId } : {}),
+        AND: [
+          { timeStart: { lt: endTime } },  // reservation starts before range ends
+          { timeEnd: { gt: startTime } }   // reservation ends after range starts
+        ]
+      }
+    });
+
+    console.log('Reservations fetched:', result);
+
+    return {
+      success: true,
+      reservations: result
+    };
+  } catch (error) {
+    console.error('Error fetching reservations by time range:', error);
+    return {
+      success: false,
+      error
+    };
+  }
+}
 
 // delete a existing reservation
 export async function deleteReservationById(reservationId: number): Promise<

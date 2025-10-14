@@ -9,7 +9,7 @@
 */
 
 import { PrismaClient } from "@prisma/client";
-import type { Room, Reservation } from "@prisma/client";
+import type { Room } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
