@@ -126,9 +126,13 @@ class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
                   if (value == null || value.trim().isEmpty) {
                     return 'Enter a room ID';
                   }
-                  if (!widget.rooms.contains(value.trim())) {
+                  
+                  final roomExists = widget.rooms.any((room) => room.roomId == value.trim());
+                  
+                  if (!roomExists) {
                     return 'Room does not exist in system';
                   }
+                  
                   return null;
                 },
               ),
@@ -161,6 +165,7 @@ class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
               TextFormField(
                 controller: _capacityCtrl,
                 keyboardType: TextInputType.number,
+                enabled: true, 
                 decoration: const InputDecoration(labelText: 'Capacity'),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Enter capacity';

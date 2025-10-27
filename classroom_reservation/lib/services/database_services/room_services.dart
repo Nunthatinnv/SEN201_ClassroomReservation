@@ -76,9 +76,11 @@ class RoomServices {
         final updatedRoom = Room(
           roomId: roomId,
           roomName: data['room_name'],
-          capacity: data['capacity'] ?? 0,
+          capacity: data['capacity'],
           equipments: data['equipments'],
         );
+        //print(data['capacity']);
+        //print(updatedRoom.capacity);
         return {'success': true, 'room': updatedRoom};
       } else {
         return {'success': false, 'error': 'Room not found'};

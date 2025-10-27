@@ -62,7 +62,8 @@ class _RoomManagementScreenState extends State<RoomManagementScreen> {
     );
 
     if (updatedRoom != null) {
-      final result = await roomServices.updateRoom(updatedRoom.roomId, room.toMap());
+      final result = await roomServices.updateRoom(updatedRoom.roomId, updatedRoom.toMap());
+      print(updatedRoom.capacity);
       if (result['success']) {
         await loadRooms();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -242,6 +243,7 @@ class _AddEditRoomScreenState extends State<AddEditRoomScreen> {
               TextFormField(
                 controller: _capacityCtrl,
                 keyboardType: TextInputType.number,
+                enabled: true,
                 decoration: const InputDecoration(labelText: 'Capacity'),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Enter capacity';
