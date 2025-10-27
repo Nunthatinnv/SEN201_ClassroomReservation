@@ -18,19 +18,23 @@ model Room {
   roomName            String?   @map("room_name")
   capacity            Int
   equipments          String?
-
-  @@map("Rooms")
   Reservation Reservation[]
 }
 
 model Reservation {
   reservationId       Int       @map("reservation_id")  @id @default(autoincrement())
+  series              Series    @relation(fields: [seriesId], references: [seriesId]) 
   seriesId            String    @map("series_id")
   room                Room      @relation(fields: [roomId], references: [roomId]) 
   roomId              String    @map("room_id") 
   timeStart           DateTime  @map("time_start")
   timeEnd             DateTime  @map("time_end")
   competency          String
+}
 
-  @@map("Reservations")
+model Series {
+  seriesId            String    @map("series_id")  @id
+  capacity            Int
+  repetition          Int
+  Reservation Reservation[]
 }

@@ -11,6 +11,7 @@ import { randomUUID } from "crypto";
 import { deleteReservationBySeriesId, getReservationsByTimeRange } from "./reservationService";
 import { createReservationBySlotData } from "./reservationService";
 import type { Slot } from "../types";
+import { createSeries, editSeriesbyId, deleteSeriesById } from "../Series/sereisService";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
 
@@ -24,7 +25,7 @@ function isOverlap(startA: Date, endA: Date, startB: Date, endB: Date): boolean 
 // Generate repeated weekly slots
 // timeStart and timeEnd: timeslot of first week of reservation
 // rep: number of weeks the reservation will repeat 
-function generateWeeklySlots(timeStart: Date, timeEnd: Date, rep: number): Slot[] {
+export function generateWeeklySlots(timeStart: Date, timeEnd: Date, rep: number): Slot[] {
   const slots: Slot[] = [];
 
   // Convert input strings to Date objects
@@ -88,7 +89,14 @@ async function checkConflicts(seriesId: string | null, roomId: string, slots: Sl
 // ---------- Repeatation Reservation Logics ----------
 
 // Add a new reservation series to the database.
-export async function addReservation(roomId: string, timeStart: Date, timeEnd: Date, rep: number, competency: string): Promise<boolean> {
+export async function addReservation(
+  roomId: string, 
+  timeStart: Date, 
+  timeEnd: Date, 
+  capacity: number, 
+  rep: number, 
+  competency: string
+): Promise<boolean> {
   const slots = generateWeeklySlots(timeStart, timeEnd, rep);
   const isConflict = await checkConflicts(null, roomId, slots);
 
@@ -106,6 +114,7 @@ export async function addReservation(roomId: string, timeStart: Date, timeEnd: D
     try {
       // Insert slots into database
       await createReservationBySlotData(newSlotData);
+      await createSeries(seriesId, capacity, rep);
       console.log("Reservations created successfully");
       return true;
     } catch (error) {
@@ -117,7 +126,15 @@ export async function addReservation(roomId: string, timeStart: Date, timeEnd: D
 
 
 // Edit an existing reservation series by seriesId.
-export async function editReservation(seriesId: string, roomId: string, timeStart: Date, timeEnd: Date, rep: number, competency: string): Promise<boolean> {
+export async function editReservation(
+  seriesId: string, 
+  roomId: string, 
+  timeStart: Date, 
+  timeEnd: Date, 
+  capacity: number, 
+  rep: number, 
+  competency: string
+): Promise<boolean> {
   const slots = generateWeeklySlots(timeStart, timeEnd, rep);
   const isConflict = await checkConflicts(seriesId, roomId, slots);
 
@@ -133,11 +150,10 @@ export async function editReservation(seriesId: string, roomId: string, timeStar
       competency,
     }));
     try {
-      // delete existing reservation series
+      // delete existing reservation series and add new reservation series with same seriesId
       await deleteReservationBySeriesId(seriesId);
-      // add new reservation series with same seriesId
       await createReservationBySlotData(newSlotData);
-
+      await editSeriesbyId(seriesId, capacity, rep)
       console.log("Reservations edited successfully");
       return true;
     } catch (error) {
@@ -152,6 +168,7 @@ export async function editReservation(seriesId: string, roomId: string, timeStar
 export async function deleteReservation(seriesId: string): Promise<boolean> {
   try {
     await deleteReservationBySeriesId(seriesId);
+    await deleteSeriesById(seriesId)
     console.log("Reservations deleted successfully");
     return true;
   } catch (error) {
