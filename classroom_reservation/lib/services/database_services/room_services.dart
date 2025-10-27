@@ -6,6 +6,20 @@ import 'reservation_services.dart';
 class RoomServices {
   final dbHelper = DatabaseHelper();
 
+  // Returns true if the room with [roomId] exists
+  Future<bool> roomExists(String roomId) async {
+    final db = await dbHelper.database;
+
+    final result = await db.query(
+      'Room',
+      columns: ['room_id'],
+      where: 'room_id = ?',
+      whereArgs: [roomId],
+      limit: 1,
+    );
+
+    return result.isNotEmpty;
+  }
 
   // ---------- Create ----------
   Future<Map<String, dynamic>> createRoom(Room room) async {

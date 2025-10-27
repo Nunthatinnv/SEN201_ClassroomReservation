@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import '../models/reservation.dart';
 import 'package:intl/intl.dart';
+import '../models/reservation.dart';
+import '../models/room.dart';
 
-/// Add/Edit screen
+// Add/Edit screen
 class AddEditReservationScreen extends StatefulWidget {
   final String mode; // 'add' or 'edit'
   final Reservation? reservation;
+  final List<Room> rooms; 
 
-  const AddEditReservationScreen({super.key, required this.mode, this.reservation});
+  const AddEditReservationScreen({super.key, required this.mode, this.reservation, required this.rooms});
 
   @override
   State<AddEditReservationScreen> createState() => _AddEditReservationScreenState();
@@ -120,9 +122,15 @@ class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
               TextFormField(
                 controller: _roomCtrl,
                 decoration: const InputDecoration(labelText: 'Room ID'),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Enter a room ID'
-                    : null,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Enter a room ID';
+                  }
+                  if (!widget.rooms.contains(value.trim())) {
+                    return 'Room does not exist in system';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 8),
 

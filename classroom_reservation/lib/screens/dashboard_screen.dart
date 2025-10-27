@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/daycell.dart';
-import '../models/reservation.dart';
 import '../services/database_services/reservation_services.dart';
 import '../services/database_services/series_services.dart';
+import '../services/database_services/room_services.dart';
+import '../models/reservation.dart';
+import '../models/room.dart';
+import '../models/daycell.dart';
 import '../services/reservation_controller.dart';
-import 'add_edit_reservation_screen.dart' as add_edit;
-import '../widgets/reservation_card.dart';
+import 'add_edit_reservation_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,9 +18,11 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final ReservationServices reservationServices = ReservationServices();
+  final RoomServices roomServices = RoomServices();
   final SeriesServices seriesServices = SeriesServices();
 
   List<Reservation> reservations = [];
+  List<Room> rooms = [];
   bool showExportModal = false;
   String selectedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -27,6 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     loadReservations();
+    loadRooms();
   }
 
   Future<void> loadReservations() async {
@@ -39,6 +43,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       print('Error loading reservations: ${result['error']}');
     }
   }
+
+  Future<void> loadRooms() async {
+    final result = await roomServices.getAllRooms();
+    if (result['success']) {
+      setState(() {
+        rooms = (result['rooms'] as List<Room>?) ?? [];
+      });
+    } else {
+      print('Error loading rooms: ${result['error']}');
+    }
+  }
+
 
   List<DayCell?> getCurrentMonthDays() {
   final now = DateTime.now();
@@ -73,7 +89,7 @@ List<Reservation> getReservationsForDate(String date) {
   Future<void> handleAdd() async {
     final input = await Navigator.push<ReservationInput>(
       context,
-      MaterialPageRoute(builder: (_) => add_edit.AddEditReservationScreen(mode: 'add')),
+      MaterialPageRoute(builder: (_) => AddEditReservationScreen(mode: 'add', rooms: rooms,)),
     );
 
     if (input != null) {
@@ -97,9 +113,10 @@ List<Reservation> getReservationsForDate(String date) {
     final input = await Navigator.push<ReservationInput>(
       context,
       MaterialPageRoute(
-        builder: (_) => add_edit.AddEditReservationScreen(
+        builder: (_) => AddEditReservationScreen(
           mode: 'edit',
           reservation: reservation,
+          rooms: rooms
         ),
       ),
     );
@@ -291,7 +308,7 @@ List<Reservation> getReservationsForDate(String date) {
                         else
                           Column(
                             children: selectedDateReservations.map((reservation) {
-                              return ReservationCard(
+                              return _ReservationCard(
                                 reservation: reservation,
                                 onEdit: () => handleEdit(reservation),
                                 onDelete: () => handleDelete(reservation),
@@ -354,6 +371,76 @@ List<Reservation> getReservationsForDate(String date) {
             // TextButton(onPressed: () => setState(() => showExportModal = false), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ReservationCard extends StatelessWidget {
+  final Reservation reservation;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final bool showDateAndRoom;
+
+  const _ReservationCard({
+    super.key,
+    required this.reservation,
+    required this.onEdit,
+    required this.onDelete,
+    this.showDateAndRoom = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            reservation.competency,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            showDateAndRoom
+                ? '${reservation.roomId} • ${DateFormat('yyyy-MM-dd').format(reservation.timeStart)}'
+                : reservation.roomId,
+            style: const TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${DateFormat('HH:mm').format(reservation.timeStart)} - ${DateFormat('HH:mm').format(reservation.timeEnd)}',
+            style: const TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onEdit,
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF9800)),
+                  child: const Text('Edit'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onDelete,
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF44336)),
+                  child: const Text('Delete'),
+                ),
+              ),
+            ],
+          ),
+        ],
+
       ),
     );
   }
