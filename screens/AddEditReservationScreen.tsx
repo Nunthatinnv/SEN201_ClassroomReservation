@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 
-export default function AddEditReservationScreen({ route, navigation }) {
+export default function AddEditReservationScreen({ route, navigation }: { route: any, navigation: any}) {
   const { mode, reservation, onSave } = route.params;
   const isEdit = mode === 'edit';
   
@@ -80,7 +80,7 @@ export default function AddEditReservationScreen({ route, navigation }) {
     return recommendations;
   };
 
-  const applyRecommendation = (recommendation) => {
+  const applyRecommendation = (recommendation: any) => {
     setRoom(recommendation.room);
     setTime(recommendation.time);
     setShowRecommendations(false);

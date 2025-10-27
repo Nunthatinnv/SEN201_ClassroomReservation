@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 
-export default function DashboardScreen({ route, navigation }) {
+export default function DashboardScreen({ route, navigation }: {route: any, navigation: any}) {
   
   // Sample reservation data
   const [reservations, setReservations] = useState([
@@ -46,24 +46,24 @@ export default function DashboardScreen({ route, navigation }) {
     return months[new Date().getMonth()] + ' ' + new Date().getFullYear();
   };
 
-  const getReservationsForDate = (date) => {
+  const getReservationsForDate = (date: any) => {
     return reservations.filter(r => r.date === date);
   };
 
   const handleAdd = () => {
     navigation.navigate('AddEditReservation', { 
       mode: 'add',
-      onSave: (newReservation) => {
+      onSave: (newReservation: any) => {
         setReservations([...reservations, { ...newReservation, id: Date.now() }]);
       }
     });
   };
 
-  const handleEdit = (reservation) => {
+  const handleEdit = (reservation: any) => {
     navigation.navigate('AddEditReservation', { 
       mode: 'edit',
       reservation: reservation,
-      onSave: (updatedReservation) => {
+      onSave: (updatedReservation: any) => {
         setReservations(reservations.map(r => 
           r.id === updatedReservation.id ? updatedReservation : r
         ));
@@ -71,7 +71,7 @@ export default function DashboardScreen({ route, navigation }) {
     });
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = (id: any) => {
     Alert.alert(
       'Delete Reservation',
       'Are you sure you want to delete this reservation?',
@@ -86,7 +86,7 @@ export default function DashboardScreen({ route, navigation }) {
     );
   };
 
-  const handleExport = (format) => {
+  const handleExport = (format: any) => {
     setShowExportModal(false);
     Alert.alert('Export', `Exporting to ${format} format...`);
   };
