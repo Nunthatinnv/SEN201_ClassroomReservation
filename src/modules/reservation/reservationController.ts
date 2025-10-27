@@ -24,7 +24,7 @@ function isOverlap(startA: Date, endA: Date, startB: Date, endB: Date): boolean 
 // Generate repeated weekly slots
 // timeStart and timeEnd: timeslot of first week of reservation
 // rep: number of weeks the reservation will repeat 
-function generateWeeklySlots(timeStart: Date, timeEnd: Date, rep: number): Slot[] {
+export function generateWeeklySlots(timeStart: Date, timeEnd: Date, rep: number): Slot[] {
   const slots: Slot[] = [];
 
   // Convert input strings to Date objects

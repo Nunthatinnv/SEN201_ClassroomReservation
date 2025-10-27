@@ -10,6 +10,8 @@
 
 import { PrismaClient } from "@prisma/client";
 import type { Room } from "@prisma/client";
+import { generateWeeklySlots } from "../reservation/reservationController"
+import { getReservationsByTimeRange } from "../reservation/reservationService"
 
 const prisma = new PrismaClient();
 
@@ -79,6 +81,57 @@ export async function getRoomById(roomId: string): Promise<
 }
 
 
+export async function getRecommendedRooms(
+    timeStart: Date,
+    timeEnd: Date,
+    rep: number,
+    capacity: number
+): Promise<{ success: true; rooms: Room[] } | { success: false; error: any }> {
+    console.log('getRecommendedRooms called with:', { timeStart, timeEnd, capacity });
+    try {
+        // Generate all weekly time slots
+        const timeSlots = generateWeeklySlots(timeStart, timeEnd, rep);
+        
+        // First, get all rooms that can accommodate the number of students
+        const suitableRooms = await prisma.room.findMany({
+        where: {
+            capacity: {
+            gte: capacity,
+            },
+        },
+        });
+        
+        if (suitableRooms.length === 0) {
+        return { success: true, rooms: [] }; // No rooms found with sufficient capacity
+        }
+        
+        const bookedRoomIds = new Set<string>();
+
+        for (const slot of timeSlots) {
+        const result = await getReservationsByTimeRange(null, slot.timeStart, slot.timeEnd);
+        
+        if (!result.success) {
+            return { success: false, error: result.error };
+        }
+        
+        // Add all room IDs from overlapping reservations to the set
+        result.reservations.forEach(reservation => {
+            bookedRoomIds.add(reservation.roomId);
+        });
+        }
+        
+        // Filter suitable rooms to exclude those that have ANY overlap with the time slots
+        const availableRooms = suitableRooms.filter((room: { roomId: any; }) => !bookedRoomIds.has(room.roomId));
+        
+        
+        console.log('Recommended rooms:', availableRooms);
+        return { success: true, rooms: availableRooms };
+    } catch (error) {
+        console.error('Error getting recommended rooms:', error);
+        return { success: false, error };
+    }
+}
+
 
 // ---------- ROOM Update ----------
 
@@ -128,41 +181,3 @@ export async function deleteRoom(roomId: string): Promise<
         };
     }
 }
-
-
-// Example usage
-async function main() {
-    // // Room CRUD
-    // const room = await createRoom({ roomId: "roomA", name: "Room A", capacity: 30 });
-    // console.log("Created room:", room);
-
-    // const rooms = await getRooms();
-    // console.log("All rooms:", rooms);
-
-    // const updatedRoom = await updateRoom("roomA", { name: "Room Alpha", capacity: 35 });
-    // console.log("Updated room:", updatedRoom);
-
-    // // Reservation CRUD
-    // const reservation = await createReservation({ roomId: "roomA", timeStart: new Date("2025-10-15T09:00:00Z"), timeEnd: new Date("2025-10-15T10:00:00Z"), competency: "Math" });
-    // console.log("Created reservation:", reservation);
-
-    // const reservations = await getReservations();
-    // console.log("All reservations:", reservations);
-
-    // const updatedReservation = await updateReservation(reservation.reservationId, { timeEnd: new Date("2025-10-15T11:00:00Z"), competency: "Physics" });
-    // console.log("Updated reservation:", updatedReservation);
-
-    // // Clean up
-    // await deleteReservation(reservation.reservationId);
-    // await deleteRoom("roomA");
-}
-
-main()
-    .then(async () => {
-        await prisma.$disconnect();
-    })
-    .catch(async (e) => {
-        console.error(e)
-        await prisma.$disconnect()
-        
-    })
