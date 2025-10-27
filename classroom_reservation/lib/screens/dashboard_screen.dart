@@ -97,7 +97,7 @@ List<Reservation> getReservationsForDate(String date) {
     );
 
     if (input != null) {
-      bool success = await addReservation(
+      final result = await addReservation(
         reservationServices,
         seriesServices,
         input.reservation.roomId,
@@ -108,7 +108,24 @@ List<Reservation> getReservationsForDate(String date) {
         input.reservation.competency,
       );
 
-      if (success) await loadReservations();
+      if (result['success']) {
+        await loadReservations();
+      } else {
+        // Show error message
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Cannot Add Reservation'),
+            content: Text(result['error'] ?? 'Unknown error'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -120,27 +137,44 @@ List<Reservation> getReservationsForDate(String date) {
         builder: (_) => AddEditReservationScreen(
           mode: 'edit',
           reservation: reservation,
-          rooms: rooms
+          rooms: rooms,
         ),
       ),
     );
 
     if (input != null) {
-      bool success = await editReservation(
+      final result = await editReservation(
         reservationServices,
         seriesServices,
-        reservation.seriesId,        // existing seriesId
-        input.reservation.roomId,    // updated roomId
-        input.reservation.timeStart, // updated timeStart
-        input.reservation.timeEnd,   // updated timeEnd
-        input.capacity,              // updated capacity
-        input.repetition,            // updated repetition
-        input.reservation.competency // updated competency
+        reservation.seriesId,
+        input.reservation.roomId,
+        input.reservation.timeStart,
+        input.reservation.timeEnd,
+        input.capacity,
+        input.repetition,
+        input.reservation.competency,
       );
 
-      if (success) await loadReservations();
+      if (result['success']) {
+        await loadReservations();
+      } else {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Cannot Edit Reservation'),
+            content: Text(result['error'] ?? 'Unknown error'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
+
 
 
   Future<void> handleDelete(Reservation reservation) async {
@@ -180,27 +214,50 @@ List<Reservation> getReservationsForDate(String date) {
     final selectedDateReservations = getReservationsForDate(selectedDate);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppBar( 
         title: const Text('Room Reservations'), 
-        backgroundColor: const Color(0xFF6B8AA3),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.meeting_room),
-            tooltip: 'Manage Rooms',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => RoomManagementScreen()),
-              );
-            },
-          ),
-        ],
+        backgroundColor: const Color(0xFF6B8AA3), 
       ),
       body: Column(
         children: [
-          // Action buttons
+          // Room management box
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: GestureDetector(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => RoomManagementScreen()),
+                );
+                await loadRooms(); // refresh rooms when returning
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6B8AA3),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    'Manage Rooms',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Add / Export row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Expanded(
@@ -208,9 +265,16 @@ List<Reservation> getReservationsForDate(String date) {
                     onPressed: handleAdd,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4CAF50),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 20),
                     ),
-                    child: const Text('+ Add Reservation'),
+                    child: const Text(
+                      '+ Add Reservation',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -219,9 +283,16 @@ List<Reservation> getReservationsForDate(String date) {
                     onPressed: () => setState(() => showExportModal = true),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2196F3),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 20),
                     ),
-                    child: const Text('Export'),
+                    child: const Text(
+                      'Export',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ],

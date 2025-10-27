@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/reservation.dart';
 import '../models/room.dart';
-
+import '../services/database_services/room_services.dart';
 // Add/Edit screen
 class AddEditReservationScreen extends StatefulWidget {
   final String mode; // 'add' or 'edit'
@@ -16,6 +16,7 @@ class AddEditReservationScreen extends StatefulWidget {
 }
 
 class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
+  final RoomServices roomServices = RoomServices();
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _roomCtrl;
   late TextEditingController _competencyCtrl;
@@ -107,17 +108,8 @@ class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Competency / Name
-              TextFormField(
-                controller: _competencyCtrl,
-                decoration: const InputDecoration(labelText: 'Competency'),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Enter a name or competency'
-                    : null,
-              ),
-              const SizedBox(height: 8),
-
               // Room ID
               TextFormField(
                 controller: _roomCtrl,
@@ -126,15 +118,21 @@ class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
                   if (value == null || value.trim().isEmpty) {
                     return 'Enter a room ID';
                   }
-                  
-                  final roomExists = widget.rooms.any((room) => room.roomId == value.trim());
-                  
-                  if (!roomExists) {
-                    return 'Room does not exist in system';
-                  }
-                  
+                  final roomExists =
+                      widget.rooms.any((room) => room.roomId == value.trim());
+                  if (!roomExists) return 'Room does not exist in system';
                   return null;
                 },
+              ),
+              const SizedBox(height: 8),
+
+              // Competency
+              TextFormField(
+                controller: _competencyCtrl,
+                decoration: const InputDecoration(labelText: 'Competency'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Enter a name or competency'
+                    : null,
               ),
               const SizedBox(height: 8),
 
@@ -148,28 +146,29 @@ class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
               ),
               const SizedBox(height: 8),
 
-              // Repetition (number only)
+              // Repetition
               TextFormField(
                 controller: _repetitionCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'Repetition'),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Enter repetition';
-                  if (int.tryParse(v.trim()) == null) return 'Enter a valid number';
+                  if (int.tryParse(v.trim()) == null)
+                    return 'Enter a valid number';
                   return null;
                 },
               ),
               const SizedBox(height: 16),
 
-              // capacity (number only)
+              // Capacity
               TextFormField(
                 controller: _capacityCtrl,
                 keyboardType: TextInputType.number,
-                enabled: true, 
                 decoration: const InputDecoration(labelText: 'Capacity'),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Enter capacity';
-                  if (int.tryParse(v.trim()) == null) return 'Enter a valid number';
+                  if (int.tryParse(v.trim()) == null)
+                    return 'Enter a valid number';
                   return null;
                 },
               ),
@@ -183,6 +182,62 @@ class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
                   minimumSize: const Size.fromHeight(48),
                 ),
                 child: const Text('Save'),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Recommended Rooms button
+              ElevatedButton(
+                onPressed: () async {
+                  final capacity = int.tryParse(_capacityCtrl.text.trim()) ?? 0;
+                  final repetition =
+                      int.tryParse(_repetitionCtrl.text.trim()) ?? 1;
+
+                  final result = await roomServices.getRecommendedRooms(
+                    _timeStart,
+                    _timeEnd,
+                    repetition,
+                    capacity,
+                  );
+                  print(result);
+
+                  if (result['success']) {
+                    final rooms = (result['rooms'] as List<dynamic>).cast<Room>();
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Recommended Rooms'),
+                        content: rooms.isEmpty
+                            ? const Text('No available rooms found')
+                            : Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: rooms
+                                    .map((r) => ListTile(
+                                          title: Text(r.roomId),
+                                          subtitle:
+                                              Text('Capacity: ${r.capacity}'),
+                                        ))
+                                    .toList(),
+                              ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: ${result['error']}')),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2196F3),
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                child: const Text('Get Recommended Rooms'),
               ),
             ],
           ),

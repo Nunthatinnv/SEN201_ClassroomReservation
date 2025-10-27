@@ -73,7 +73,7 @@ Future<bool> checkConflicts(
 }
 
 
-Future<bool> addReservation(
+Future<Map<String, dynamic>> addReservation(
   ReservationServices reservationServices,
   SeriesServices seriesServices,
   String roomId,
@@ -86,7 +86,12 @@ Future<bool> addReservation(
   List<Slot> slots = generateWeeklySlots(timeStart, timeEnd, rep);
   bool isConflict = await checkConflicts(reservationServices, null, roomId, slots);
 
-  if (isConflict) return false;
+  if (isConflict) {
+    return {
+      'success': false,
+      'error': 'Conflict detected: Room $roomId is already booked for one or more selected times.'
+    };
+  }
 
   String seriesId = Uuid().v4(); // generate unique ID
   List<Reservation> newReservations = slots.map((slot) {
@@ -103,15 +108,14 @@ Future<bool> addReservation(
     await reservationServices.createReservations(newReservations);
     await seriesServices.createSeries(seriesId, capacity, rep);
     print('Reservations created successfully');
-    return true;
+    return {'success': true};
   } catch (error) {
     print('Error inserting reservations: $error');
-    return false;
+    return {'success': false, 'error': 'Error inserting reservations: $error'};
   }
 }
 
-
-Future<bool> editReservation(
+Future<Map<String, dynamic>> editReservation(
   ReservationServices reservationServices,
   SeriesServices seriesServices,
   String seriesId,
@@ -125,7 +129,12 @@ Future<bool> editReservation(
   List<Slot> slots = generateWeeklySlots(timeStart, timeEnd, rep);
   bool isConflict = await checkConflicts(reservationServices, seriesId, roomId, slots);
 
-  if (isConflict) return false;
+  if (isConflict) {
+    return {
+      'success': false,
+      'error': 'Conflict detected: Room $roomId is already booked for one or more selected times.'
+    };
+  }
 
   List<Reservation> newReservations = slots.map((slot) {
     return Reservation(
@@ -138,16 +147,23 @@ Future<bool> editReservation(
   }).toList();
 
   try {
+    // Delete old reservations in the series
     await reservationServices.deleteReservationsBySeriesId(seriesId);
+
+    // Insert updated reservations
     await reservationServices.createReservations(newReservations);
+
+    // Update series info
     await seriesServices.editSeriesById(seriesId, capacity, rep);
+
     print('Reservations edited successfully');
-    return true;
+    return {'success': true};
   } catch (error) {
     print('Error editing reservations: $error');
-    return false;
+    return {'success': false, 'error': 'Error editing reservations: $error'};
   }
 }
+
 
 
 Future<bool> deleteReservation(
