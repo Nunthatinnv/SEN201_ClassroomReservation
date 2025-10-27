@@ -12,9 +12,9 @@
 import { randomUUID } from "crypto";
 import { deleteReservationBySeriesId, getReservationsByTimeRange } from "./reservationService";
 import { createReservationBySlotData } from "./reservationService";
-import { getRecommendedRooms } from "./reservationService";
+import { getRecommendedRooms, getScheduleData } from "./reservationService";
 import type { Slot } from "../types";
-import type { Room } from "../types";
+import type { Room } from "@prisma/client";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
 
@@ -93,6 +93,58 @@ async function checkConflicts(seriesId: string | null, roomId: string, slots: Sl
   return false; // no conflicts
 }
 
+
+// ---------- SCHEDULE EXPORT CONTROLLER ----------
+/**
+ * Exports schedule data as a CSV string.
+ *
+ * This function fetches reservation details within a specified date range,
+ * optionally filtered by room ID and competency, and formats them into
+ * a comma-separated values (CSV) string for download or display.
+ *
+ * @param startDate The start date for filtering reservations.
+ * @param endDate The end date for filtering reservations.
+ * @param roomId Optional. The ID of a specific room to filter by.
+ * @param competency Optional. The competency name to filter by.
+ * @returns A Promise that resolves to an object indicating success and containing the CSV data string, or an error.
+ */
+export async function exportScheduleAsCsv(
+    startDate: Date,
+    endDate: Date,
+    roomId: string | null = null,
+    competency: string | null = null
+): Promise<{ success: true; csvData: string } | { success: false; error: any }> {
+    try {
+        const scheduleResult = await getScheduleData(startDate, endDate, roomId, competency);
+
+        if (!scheduleResult.success) {
+            return { success: false, error: scheduleResult.error };
+        }
+
+        const schedule = scheduleResult.schedule;
+
+        if (schedule.length === 0) {
+            return { success: true, csvData: "No reservations found for the selected criteria." };
+        }
+
+        // Define CSV headers
+        const headers = "Room ID,Room Name,Capacity,Time Start,Time End,Competency,Number of Students\n";
+
+        // Map reservation data to CSV rows
+        const csvRows = schedule.map(res => {
+            const roomName = res.Room ? res.Room.roomName || 'N/A' : 'N/A';
+            const capacity = res.Room ? res.Room.capacity : 'N/A';
+            return `"${res.roomId}","${roomName}","${capacity}","${res.timeStart.toISOString()}","${res.timeEnd.toISOString()}","${res.competency}","${res.numberOfStudents}"`;
+        });
+
+        const csvData = headers + csvRows.join('\n');
+
+        return { success: true, csvData };
+    } catch (error) {
+        console.error('Error exporting schedule as CSV:', error);
+        return { success: false, error };
+    }
+}
 
 
 // ---------- Repeatation Reservation Logics ----------

@@ -11,8 +11,7 @@
 */
 
 import { PrismaClient } from "@prisma/client";
-import type { Reservation } from "../types";
-import type { Room } from "../types";
+import type { Reservation, Room } from "@prisma/client";
 import type { SlotData } from "../types";
 
 const prisma = new PrismaClient();
@@ -99,6 +98,45 @@ export async function getReservationsByTimeRange(roomId: string | null, startTim
     };
   }
 }
+
+// ---------- SCHEDULE DATA RETRIEVAL ----------
+
+export async function getScheduleData(startDate: Date, endDate: Date, roomId: string | null = null, competency: string | null = null): Promise<
+    { success: true; schedule: (Reservation & { Room: Room | null })[] } | { success: false; error: any }
+> {
+    try {
+        const reservationsResult = await prisma.reservation.findMany({
+            where: {
+                ...(roomId ? { roomId } : {}),
+                ...(competency ? { competency } : {}), // Add competency filter
+                AND: [
+                    { timeStart: { lt: endDate } },
+                    { timeEnd: { gt: startDate } },
+                ],
+            },
+        });
+
+        // To get room details for each reservation, we need to fetch them separately
+        // or modify getReservationsByTimeRange to include room data using Prisma's `include`
+        const reservationsWithRoom = await Promise.all(reservationsResult.map(async (res: { roomId: any; reservationId: any; }) => {
+            const room = await prisma.room.findUnique({
+                where: { roomId: res.roomId },
+            });
+            if (!room) {
+                // Handle case where room is not found (shouldn't happen if data integrity is maintained)
+                console.warn(`Room with ID ${res.roomId} not found for reservation ${res.reservationId}`);
+                return { ...res, Room: null }; // Or handle as an error if room is mandatory
+            }
+            return { ...res, Room: room };
+        }));
+
+        return { success: true, schedule: reservationsWithRoom };
+    } catch (error) {
+        console.error('Error fetching schedule data:', error);
+        return { success: false, error };
+    }
+}
+
 
 // ---------- ROOM RECOMMENDATION ----------
 
