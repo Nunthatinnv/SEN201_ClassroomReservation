@@ -21,6 +21,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final ReservationServices reservationServices = ReservationServices();
   final RoomServices roomServices = RoomServices();
   final SeriesServices seriesServices = SeriesServices();
+  late DateTime _displayedMonth;
 
   List<Reservation> reservations = [];
   List<Room> rooms = [];
@@ -30,6 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _displayedMonth = DateTime.now();
     loadReservations();
     loadRooms();
   }
@@ -58,27 +60,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 
   List<DayCell?> getCurrentMonthDays() {
-  final now = DateTime.now();
-  final year = now.year;
-  final month = now.month;
+    final year = _displayedMonth.year;
+    final month = _displayedMonth.month;
 
-  final firstOfMonth = DateTime(year, month, 1);
-  final firstWeekday = firstOfMonth.weekday % 7; // Sunday=0
-  final totalDays = DateTime(year, month + 1, 0).day;
+    final firstOfMonth = DateTime(year, month, 1);
+    final firstWeekday = firstOfMonth.weekday % 7; // Sunday = 0
+    final totalDays = DateTime(year, month + 1, 0).day;
 
-  final List<DayCell?> days = [];
+    final List<DayCell?> days = [];
 
-  for (int i = 0; i < firstWeekday; i++) days.add(null);
+    for (int i = 0; i < firstWeekday; i++) days.add(null);
 
-  for (int d = 1; d <= totalDays; d++) {
-    final date = DateTime(year, month, d);
-    final dateStr = DateFormat('yyyy-MM-dd').format(date);
-    final hasReservation = reservations.any((r) =>
-        DateFormat('yyyy-MM-dd').format(r.timeStart) == dateStr);
-    days.add(DayCell(day: d, date: dateStr, hasReservation: hasReservation));
+    for (int d = 1; d <= totalDays; d++) {
+      final date = DateTime(year, month, d);
+      final dateStr = DateFormat('yyyy-MM-dd').format(date);
+      final hasReservation = reservations.any(
+          (r) => DateFormat('yyyy-MM-dd').format(r.timeStart) == dateStr);
+      days.add(DayCell(day: d, date: dateStr, hasReservation: hasReservation));
+    }
+
+    return days;
   }
-  return days;
-}
+
 
 List<Reservation> getReservationsForDate(String date) {
   return reservations
@@ -203,7 +206,10 @@ List<Reservation> getReservationsForDate(String date) {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: handleAdd,
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4CAF50), padding: const EdgeInsets.symmetric(vertical: 14)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4CAF50),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                     child: const Text('+ Add Reservation'),
                   ),
                 ),
@@ -211,7 +217,10 @@ List<Reservation> getReservationsForDate(String date) {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => setState(() => showExportModal = true),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2196F3), padding: const EdgeInsets.symmetric(vertical: 14)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2196F3),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                     child: const Text('Export'),
                   ),
                 ),
@@ -230,19 +239,56 @@ List<Reservation> getReservationsForDate(String date) {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
+                      ],
                     ),
                     child: Column(
                       children: [
-                        Text(DateFormat.yMMMM().format(DateTime.now()), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        // Month navigation
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.chevron_left),
+                              onPressed: () {
+                                setState(() {
+                                  _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month - 1);
+                                });
+                              },
+                            ),
+                            Text(
+                              DateFormat.yMMMM().format(_displayedMonth),
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.chevron_right),
+                              onPressed: () {
+                                setState(() {
+                                  _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month + 1);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 10),
+                        // Weekday headers
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-                              .map((d) => Expanded(child: Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))))
+                              .map((d) => Expanded(
+                                    child: Center(
+                                      child: Text(
+                                        d,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold, color: Colors.grey),
+                                      ),
+                                    ),
+                                  ))
                               .toList(),
                         ),
                         const SizedBox(height: 8),
+                        // Calendar grid
                         LayoutBuilder(builder: (context, constraints) {
                           final cellWidth = (constraints.maxWidth - 6) / 7;
                           return Wrap(
@@ -312,14 +358,18 @@ List<Reservation> getReservationsForDate(String date) {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Reservations for $selectedDate', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text('Reservations for $selectedDate',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         if (selectedDateReservations.isEmpty)
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                            child: const Center(child: Text('No reservations for this date', style: TextStyle(color: Colors.grey))),
+                            decoration: BoxDecoration(
+                                color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                            child: const Center(
+                                child: Text('No reservations for this date',
+                                    style: TextStyle(color: Colors.grey))),
                           )
                         else
                           Column(
@@ -334,29 +384,6 @@ List<Reservation> getReservationsForDate(String date) {
                       ],
                     ),
                   ),
-
-                  // All reservations
-                  // Padding(
-                  //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  //   child: Column(
-                  //     crossAxisAlignment: CrossAxisAlignment.start,
-                  //     children: [
-                  //       const Text('All Reservations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  //       const SizedBox(height: 8),
-                  //       Column(
-                  //         children: reservations.map((reservation) {
-                  //           return _ReservationCard(
-                  //             reservation: reservation,
-                  //             onEdit: () => handleEdit(reservation),
-                  //             onDelete: () => handleDelete(reservation),
-                  //             showDateAndRoom: true,
-                  //           );
-                  //         }).toList(),
-                  //       ),
-                  //       const SizedBox(height: 20),
-                  //     ],
-                  //   ),
-                  // ),
                 ],
               ),
             ),
@@ -366,6 +393,7 @@ List<Reservation> getReservationsForDate(String date) {
       bottomSheet: showExportModal ? _buildExportSheet() : null,
     );
   }
+
 
   Widget _buildExportSheet() {
     return Container(
