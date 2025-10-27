@@ -1,3 +1,4 @@
+import 'package:classroom_reservation/screens/room_management_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/daycell.dart';
@@ -159,7 +160,22 @@ List<Reservation> getReservationsForDate(String date) {
     final selectedDateReservations = getReservationsForDate(selectedDate);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Room Reservations'), backgroundColor: const Color(0xFF6B8AA3)),
+      appBar: AppBar(
+        title: const Text('Room Reservations'), 
+        backgroundColor: const Color(0xFF6B8AA3),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.meeting_room),
+            tooltip: 'Manage Rooms',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => RoomManagementScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           // Action buttons
