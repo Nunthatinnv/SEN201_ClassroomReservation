@@ -55,6 +55,7 @@ Future<bool> checkConflicts(
       endTime: dayEnd,
     );
 
+    print("DEBUG: $result");
     if (!result['success']) {
       print('Error checking slot: $slot, ${result['error']}');
     } else {

@@ -37,3 +37,11 @@ class Reservation {
     );
   }
 }
+
+class ReservationInput {
+  final Reservation reservation;
+  final int repetition;
+  final int capacity;
+
+  ReservationInput({required this.reservation, required this.repetition, required this.capacity});
+}

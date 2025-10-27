@@ -23,6 +23,24 @@ class ReservationServices {
   }
 
   // ---------- Read ----------
+  Future<Map<String, dynamic>> getAllReservations() async {
+    try {
+      final db = await dbHelper.database;
+
+      final result = await db.query('Reservation'); // fetch all rows
+      
+      List<Reservation> reservations = result.map((r) => Reservation.fromMap(r)).toList();
+      
+      print('Query result: $reservations');
+      return {'success': true, 'reservations': reservations};
+    } catch (error) {
+      // print('Error fetching reservations: $error');
+      return {'success': true, 'error': error};
+    }
+  }
+
+
+
   Future<Map<String, dynamic>> getReservationsBySeriesId(String seriesId) async {
     try {
       final db = await dbHelper.database;

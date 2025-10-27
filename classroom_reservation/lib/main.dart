@@ -1,45 +1,17 @@
-// lib/main.dart
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'services/database_services/reservation_services.dart';
+import 'services/database_services/series_services.dart';
+import 'services/reservation_controller.dart';
+import 'models/daycell.dart';
+import 'models/reservation.dart'; // Reservation model for DB
 
 void main() {
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
+
   runApp(const MyApp());
-}
-
-class Reservation {
-  int id;
-  String name;
-  String room;
-  String date; // 'yyyy-MM-dd'
-  String time;
-  String duration;
-
-  Reservation({
-    required this.id,
-    required this.name,
-    required this.room,
-    required this.date,
-    required this.time,
-    required this.duration,
-  });
-
-  Reservation copyWith({
-    int? id,
-    String? name,
-    String? room,
-    String? date,
-    String? time,
-    String? duration,
-  }) {
-    return Reservation(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      room: room ?? this.room,
-      date: date ?? this.date,
-      time: time ?? this.time,
-      duration: duration ?? this.duration,
-    );
-  }
 }
 
 class MyApp extends StatelessWidget {
@@ -48,9 +20,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Room Reservations',
-      theme: ThemeData(
-        primarySwatch: Colors.blueGrey,
-      ),
+      theme: ThemeData(primarySwatch: Colors.blueGrey),
       home: const DashboardScreen(),
     );
   }
@@ -64,100 +34,85 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  List<Reservation> reservations = [
-    Reservation(
-        id: 1,
-        name: 'John Smith',
-        room: 'Room A',
-        date: '2025-10-28',
-        time: '09:00-10:00',
-        duration: '1 hour'),
-    Reservation(
-        id: 2,
-        name: 'Jane Doe',
-        room: 'Room B',
-        date: '2025-10-28',
-        time: '14:00-15:30',
-        duration: '1.5 hours'),
-    Reservation(
-        id: 3,
-        name: 'Bob Johnson',
-        room: 'Room A',
-        date: '2025-10-29',
-        time: '10:00-12:00',
-        duration: '2 hours'),
-    Reservation(
-        id: 4,
-        name: 'Alice Williams',
-        room: 'Room C',
-        date: '2025-10-30',
-        time: '11:00-12:00',
-        duration: '1 hour'),
-  ];
+  final ReservationServices reservationServices = ReservationServices();
+  final SeriesServices seriesServices = SeriesServices();
 
+  List<Reservation> reservations = [];
   bool showExportModal = false;
-  String selectedDate = '2025-10-28'; // default, mirror original file
+  String selectedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-  // Helpers to format and generate month days
-  String getMonthName() {
-    final now = DateTime.now();
-    return DateFormat.yMMMM().format(now);
+  @override
+  void initState() {
+    super.initState();
+    loadReservations();
   }
 
-  List<_DayCell?> getCurrentMonthDays() {
-    final now = DateTime.now();
-    final year = now.year;
-    final month = now.month;
-
-    final firstOfMonth = DateTime(year, month, 1);
-    final firstWeekday = firstOfMonth.weekday % 7; // Monday=1 ... Sunday=0
-    final totalDays = DateTime(year, month + 1, 0).day;
-
-    final List<_DayCell?> days = [];
-
-    // Add empty cells for days before month starts (Sunday-first grid)
-    for (int i = 0; i < firstWeekday; i++) {
-      days.add(null);
+  Future<void> loadReservations() async {
+    final result = await reservationServices.getAllReservations();
+    if (result['success']) {
+      setState(() {
+        reservations = (result['reservations'] as List<Reservation>?) ?? [];
+      });
+    } else {
+      print('Error loading reservations: ${result['error']}');
     }
-
-    for (int d = 1; d <= totalDays; d++) {
-      final date = DateTime(year, month, d);
-      final dateStr = DateFormat('yyyy-MM-dd').format(date);
-      final hasReservation =
-          reservations.any((r) => r.date == dateStr);
-      days.add(_DayCell(day: d, date: dateStr, hasReservation: hasReservation));
-    }
-
-    return days;
   }
 
-  List<Reservation> getReservationsForDate(String date) {
-    return reservations.where((r) => r.date == date).toList();
-  }
+  List<DayCell?> getCurrentMonthDays() {
+  final now = DateTime.now();
+  final year = now.year;
+  final month = now.month;
 
-  // Add: open AddEdit screen in 'add' mode. Expecting Reservation returned or null.
-  void handleAdd() async {
-    final result = await Navigator.push<Reservation>(
+  final firstOfMonth = DateTime(year, month, 1);
+  final firstWeekday = firstOfMonth.weekday % 7; // Sunday=0
+  final totalDays = DateTime(year, month + 1, 0).day;
+
+  final List<DayCell?> days = [];
+
+  for (int i = 0; i < firstWeekday; i++) days.add(null);
+
+  for (int d = 1; d <= totalDays; d++) {
+    final date = DateTime(year, month, d);
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final hasReservation = reservations.any((r) =>
+        DateFormat('yyyy-MM-dd').format(r.timeStart) == dateStr);
+    days.add(DayCell(day: d, date: dateStr, hasReservation: hasReservation));
+  }
+  return days;
+}
+
+List<Reservation> getReservationsForDate(String date) {
+  return reservations
+      .where((r) => DateFormat('yyyy-MM-dd').format(r.timeStart) == date)
+      .toList();
+}
+
+
+  Future<void> handleAdd() async {
+    final input = await Navigator.push<ReservationInput>(
       context,
-      MaterialPageRoute(
-        builder: (_) => AddEditReservationScreen(
-          mode: 'add',
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => AddEditReservationScreen(mode: 'add')),
     );
 
-    if (result != null) {
-      setState(() {
-        // mimic Date.now() id
-        final newRes = result.copyWith(id: DateTime.now().millisecondsSinceEpoch);
-        reservations.add(newRes);
-      });
+    if (input != null) {
+      bool success = await addReservation(
+        reservationServices,
+        seriesServices,
+        input.reservation.roomId,
+        input.reservation.timeStart,
+        input.reservation.timeEnd,
+        input.capacity,
+        input.repetition,
+        input.reservation.competency,
+      );
+
+      if (success) await loadReservations();
     }
   }
 
-  // Edit: open AddEdit screen with reservation prefilled. Expect updated reservation back.
-  void handleEdit(Reservation reservation) async {
-    final result = await Navigator.push<Reservation?>(
+
+  Future<void> handleEdit(Reservation reservation) async {
+    final input = await Navigator.push<ReservationInput>(
       context,
       MaterialPageRoute(
         builder: (_) => AddEditReservationScreen(
@@ -167,47 +122,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
 
-    if (result != null) {
-      setState(() {
-        reservations = reservations
-            .map((r) => r.id == result.id ? result : r)
-            .toList();
-      });
+    if (input != null) {
+      bool success = await editReservation(
+        reservationServices,
+        seriesServices,
+        reservation.seriesId,        // existing seriesId
+        input.reservation.roomId,    // updated roomId
+        input.reservation.timeStart, // updated timeStart
+        input.reservation.timeEnd,   // updated timeEnd
+        input.capacity,              // updated capacity
+        input.repetition,            // updated repetition
+        input.reservation.competency // updated competency
+      );
+
+      if (success) await loadReservations();
     }
   }
 
-  void handleDelete(int id) {
-    showDialog<bool>(
+
+  Future<void> handleDelete(Reservation reservation) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Reservation'),
-        content: const Text('Are you sure you want to delete this reservation?'),
+        content: const Text('Are you sure you want to delete all reservation which have same series with this reservation?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                reservations.removeWhere((r) => r.id == id);
-              });
-              Navigator.pop(ctx, true);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
+
+    if (confirmed == true) {
+      bool success = await deleteReservation(
+        reservationServices,
+        seriesServices,
+        reservation.seriesId, // use seriesId to delete the entire series
+      );
+
+      if (success) await loadReservations();
+    }
   }
 
-  void handleExport(String format) {
-    setState(() => showExportModal = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Exporting to $format format...')),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -215,13 +177,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final selectedDateReservations = getReservationsForDate(selectedDate);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Room Reservations'),
-        backgroundColor: const Color(0xFF6B8AA3),
-      ),
+      appBar: AppBar(title: const Text('Room Reservations'), backgroundColor: const Color(0xFF6B8AA3)),
       body: Column(
         children: [
-          // Action Buttons
+          // Action buttons
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
@@ -229,61 +188,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: handleAdd,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text('+ Add Reservation', style: TextStyle(fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4CAF50), padding: const EdgeInsets.symmetric(vertical: 14)),
+                    child: const Text('+ Add Reservation'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => setState(() => showExportModal = true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2196F3),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text('Export', style: TextStyle(fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2196F3), padding: const EdgeInsets.symmetric(vertical: 14)),
+                    child: const Text('Export'),
                   ),
                 ),
               ],
             ),
           ),
-
-          // Calendar + Reservations in a scrollable area
+          // Calendar and reservation list
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Calendar Container
+                  // Calendar container
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0,2))
-                      ],
+                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
                     ),
                     child: Column(
                       children: [
-                        Text(getMonthName(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        Text(DateFormat.yMMMM().format(DateTime.now()), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 10),
-                        // Weekday headers
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-                              .map((d) => Expanded(
-                                    child: Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey))),
-                                  ))
+                              .map((d) => Expanded(child: Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)))))
                               .toList(),
                         ),
                         const SizedBox(height: 8),
-                        // Grid (7 columns)
                         LayoutBuilder(builder: (context, constraints) {
                           final cellWidth = (constraints.maxWidth - 6) / 7;
                           return Wrap(
@@ -292,11 +236,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             children: calendarDays.map((dayInfo) {
                               final isSelected = dayInfo != null && dayInfo.date == selectedDate;
                               return GestureDetector(
-                                onTap: dayInfo == null ? null : () {
-                                  setState(() {
-                                    selectedDate = dayInfo.date;
-                                  });
-                                },
+                                onTap: dayInfo == null ? null : () => setState(() => selectedDate = dayInfo.date),
                                 child: Container(
                                   width: cellWidth,
                                   height: cellWidth,
@@ -351,7 +291,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
 
-                  // Reservations for Selected Date
+                  // Selected date reservations
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Column(
@@ -372,7 +312,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               return _ReservationCard(
                                 reservation: reservation,
                                 onEdit: () => handleEdit(reservation),
-                                onDelete: () => handleDelete(reservation.id),
+                                onDelete: () => handleDelete(reservation),
                               );
                             }).toList(),
                           ),
@@ -380,37 +320,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
 
-                  // All Reservations
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 6),
-                        const Text('All Reservations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Column(
-                          children: reservations.map((reservation) {
-                            return _ReservationCard(
-                              reservation: reservation,
-                              onEdit: () => handleEdit(reservation),
-                              onDelete: () => handleDelete(reservation.id),
-                              showDateAndRoom: true,
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
+                  // All reservations
+                  // Padding(
+                  //   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  //   child: Column(
+                  //     crossAxisAlignment: CrossAxisAlignment.start,
+                  //     children: [
+                  //       const Text('All Reservations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  //       const SizedBox(height: 8),
+                  //       Column(
+                  //         children: reservations.map((reservation) {
+                  //           return _ReservationCard(
+                  //             reservation: reservation,
+                  //             onEdit: () => handleEdit(reservation),
+                  //             onDelete: () => handleDelete(reservation),
+                  //             showDateAndRoom: true,
+                  //           );
+                  //         }).toList(),
+                  //       ),
+                  //       const SizedBox(height: 20),
+                  //     ],
+                  //   ),
+                  // ),
                 ],
               ),
             ),
           ),
         ],
       ),
-
-      // Export Modal bottom sheet
       bottomSheet: showExportModal ? _buildExportSheet() : null,
     );
   }
@@ -425,41 +362,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Select Export Format', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () => handleExport('PDF'),
-              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              child: const Text('PDF'),
-            ),
+            // const SizedBox(height: 12),
+            // ElevatedButton(onPressed: () {}, child: const Text('PDF'), style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48))),
+            // const SizedBox(height: 8),
+            // ElevatedButton(onPressed: () {}, child: const Text('Excel (XLSX)'), style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48))),
             const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: () => handleExport('Excel'),
-              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              child: const Text('Excel (XLSX)'),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: () => handleExport('CSV'),
-              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              child: const Text('CSV'),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => setState(() => showExportModal = false),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-            ),
+            ElevatedButton(onPressed: () {}, child: const Text('CSV'), style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48))),
+            // const SizedBox(height: 8),
+            // TextButton(onPressed: () => setState(() => showExportModal = false), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
           ],
         ),
       ),
     );
   }
-}
-
-class _DayCell {
-  final int day;
-  final String date;
-  final bool hasReservation;
-  _DayCell({required this.day, required this.date, required this.hasReservation});
 }
 
 class _ReservationCard extends StatelessWidget {
@@ -484,16 +399,27 @@ class _ReservationCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0,2))],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(reservation.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            reservation.competency,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 6),
-          Text(showDateAndRoom ? '${reservation.room} • ${reservation.date}' : reservation.room, style: const TextStyle(color: Colors.grey)),
+          Text(
+            showDateAndRoom
+                ? '${reservation.roomId} • ${DateFormat('yyyy-MM-dd').format(reservation.timeStart)}'
+                : reservation.roomId,
+            style: const TextStyle(color: Colors.grey),
+          ),
           const SizedBox(height: 6),
-          Text('${reservation.time} (${reservation.duration})', style: const TextStyle(color: Colors.grey)),
+          Text(
+            '${DateFormat('HH:mm').format(reservation.timeStart)} - ${DateFormat('HH:mm').format(reservation.timeEnd)}',
+            style: const TextStyle(color: Colors.grey),
+          ),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -513,19 +439,17 @@ class _ReservationCard extends StatelessWidget {
                 ),
               ),
             ],
-          )
+          ),
         ],
+
       ),
     );
   }
 }
 
-/// Simple Add/Edit screen
-/// - mode: 'add' or 'edit'
-/// - if edit, pass reservation to prefill
-/// Returns a Reservation (new or updated) on Navigator.pop
+/// Add/Edit screen
 class AddEditReservationScreen extends StatefulWidget {
-  final String mode;
+  final String mode; // 'add' or 'edit'
   final Reservation? reservation;
 
   const AddEditReservationScreen({super.key, required this.mode, this.reservation});
@@ -536,66 +460,81 @@ class AddEditReservationScreen extends StatefulWidget {
 
 class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameCtrl;
   late TextEditingController _roomCtrl;
-  late TextEditingController _dateCtrl;
-  late TextEditingController _timeCtrl;
-  late TextEditingController _durationCtrl;
-
+  late TextEditingController _competencyCtrl;
+  late TextEditingController _repetitionCtrl;
+  late TextEditingController _capacityCtrl;
+  late DateTime _timeStart;
+  late DateTime _timeEnd;
+  
+  
   @override
   void initState() {
     super.initState();
     final r = widget.reservation;
-    _nameCtrl = TextEditingController(text: r?.name ?? '');
-    _roomCtrl = TextEditingController(text: r?.room ?? '');
-    _dateCtrl = TextEditingController(text: r?.date ?? DateFormat('yyyy-MM-dd').format(DateTime.now()));
-    _timeCtrl = TextEditingController(text: r?.time ?? '');
-    _durationCtrl = TextEditingController(text: r?.duration ?? '');
+    _roomCtrl = TextEditingController(text: r?.roomId ?? '');
+    _competencyCtrl = TextEditingController(text: r?.competency ?? '');
+    _repetitionCtrl = TextEditingController(text: '1');
+    _capacityCtrl = TextEditingController(text: '1');
+    _timeStart = r?.timeStart ?? DateTime.now();
+    _timeEnd = r?.timeEnd ?? DateTime.now();
+    
+
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
     _roomCtrl.dispose();
-    _dateCtrl.dispose();
-    _timeCtrl.dispose();
-    _durationCtrl.dispose();
-    super.dispose();
+    _competencyCtrl.dispose();
+    _repetitionCtrl.dispose();
+    _capacityCtrl.dispose();
+    super.dispose(); // Always call super.dispose() last
   }
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
-    final id = widget.reservation?.id ?? DateTime.now().millisecondsSinceEpoch;
     final newRes = Reservation(
-      id: id,
-      name: _nameCtrl.text.trim(),
-      room: _roomCtrl.text.trim(),
-      date: _dateCtrl.text.trim(),
-      time: _timeCtrl.text.trim(),
-      duration: _durationCtrl.text.trim(),
+      seriesId: '', // generate or leave empty for now
+      roomId: _roomCtrl.text.trim(),
+      timeStart: _timeStart,
+      timeEnd: _timeEnd,
+      competency: _competencyCtrl.text.trim(),
     );
 
-    Navigator.pop(context, newRes);
+    final repetition = int.tryParse(_repetitionCtrl.text.trim()) ?? 1;
+    final capacity = int.tryParse(_capacityCtrl.text.trim()) ?? 1;
+
+    Navigator.pop(
+      context,
+       ReservationInput(reservation: newRes, repetition: repetition, capacity: capacity));
   }
 
-  Future<void> _pickDate() async {
-    DateTime initial;
-    try {
-      initial = DateFormat('yyyy-MM-dd').parse(_dateCtrl.text);
-    } catch (_) {
-      initial = DateTime.now();
-    }
-    final picked = await showDatePicker(
+  Future<void> _pickDateTimeRange() async {
+    final pickedDate = await showDatePicker(
       context: context,
-      initialDate: initial,
+      initialDate: _timeStart,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-    if (picked != null) {
-      _dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
-      setState(() {});
-    }
+    if (pickedDate == null) return;
+
+    final startTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_timeStart),
+    );
+    if (startTime == null) return;
+
+    final endTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_timeEnd),
+    );
+    if (endTime == null) return;
+
+    setState(() {
+      _timeStart = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, startTime.hour, startTime.minute);
+      _timeEnd = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, endTime.hour, endTime.minute);
+    });
   }
 
   @override
@@ -612,41 +551,63 @@ class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
           key: _formKey,
           child: Column(
             children: [
+              // Competency / Name
               TextFormField(
-                controller: _nameCtrl,
-                decoration: const InputDecoration(labelText: 'Name'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter name' : null,
+                controller: _competencyCtrl,
+                decoration: const InputDecoration(labelText: 'Competency'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Enter a name or competency'
+                    : null,
               ),
               const SizedBox(height: 8),
+
+              // Room ID
               TextFormField(
                 controller: _roomCtrl,
-                decoration: const InputDecoration(labelText: 'Room'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter room' : null,
+                decoration: const InputDecoration(labelText: 'Room ID'),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Enter a room ID'
+                    : null,
               ),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _dateCtrl,
-                readOnly: true,
-                decoration: InputDecoration(
-                  labelText: 'Date',
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.calendar_month),
-                    onPressed: _pickDate,
-                  ),
+
+              // Time range
+              ListTile(
+                title: Text(
+                  'Time: ${DateFormat('yyyy-MM-dd HH:mm').format(_timeStart)} - ${DateFormat('HH:mm').format(_timeEnd)}',
                 ),
-                onTap: _pickDate,
+                trailing: const Icon(Icons.calendar_today),
+                onTap: _pickDateTimeRange,
               ),
               const SizedBox(height: 8),
+
+              // Repetition (number only)
               TextFormField(
-                controller: _timeCtrl,
-                decoration: const InputDecoration(labelText: 'Time (e.g. 09:00-10:00)'),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _durationCtrl,
-                decoration: const InputDecoration(labelText: 'Duration (e.g. 1 hour)'),
+                controller: _repetitionCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Repetition'),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Enter repetition';
+                  if (int.tryParse(v.trim()) == null) return 'Enter a valid number';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
+
+              // capacity (number only)
+              TextFormField(
+                controller: _capacityCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Capacity'),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Enter capacity';
+                  if (int.tryParse(v.trim()) == null) return 'Enter a valid number';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Save button
               ElevatedButton(
                 onPressed: _save,
                 style: ElevatedButton.styleFrom(
@@ -662,3 +623,4 @@ class _AddEditReservationScreenState extends State<AddEditReservationScreen> {
     );
   }
 }
+
