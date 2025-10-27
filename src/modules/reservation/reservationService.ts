@@ -3,13 +3,16 @@
 	Author: Win - Thanawin Pattanaphol (tpattan@cmkl.ac.th)
     Edited by: Poon - Nunthatinn Veerapaiboon (nveerap@cmkl.ac.th)
 	Description: Reservation CRUD & businss logic
-	Lasted Modify: 2025-10-14 23.08
+    Modified by: Beam - Atchariyapat Sirijirakarnjareon (asiriji@cmkl.ac.th)
+    Description: Added getRecommendedRooms function for room recommendations.
+	Lasted Modify: 2025-10-27 6.13pm
 
 	License: GNU General Public License Version 3.0
 */
 
 import { PrismaClient } from "@prisma/client";
-import type { Reservation } from "@prisma/client";
+import type { Reservation } from "../types";
+import type { Room } from "../types";
 import type { SlotData } from "../types";
 
 const prisma = new PrismaClient();
@@ -97,7 +100,54 @@ export async function getReservationsByTimeRange(roomId: string | null, startTim
   }
 }
 
+// ---------- ROOM RECOMMENDATION ----------
 
+// get recommended rooms based on on capacity and time range
+export async function getRecommendedRooms(
+    timeStart: Date,
+    timeEnd: Date,
+    numberOfStudents: number
+): Promise<{ success: true; rooms: Room[] } | { success: false; error: any }> {
+    console.log('getRecommendedRooms called with:', { timeStart, timeEnd, numberOfStudents });
+    try {
+        // First, get all rooms that can accommodate the number of students
+        const suitableRooms = await prisma.room.findMany({
+            where: {
+                capacity: {
+                    gte: numberOfStudents,
+                },
+            },
+        });
+
+        if (suitableRooms.length === 0) {
+            return { success: true, rooms: [] }; // No rooms found with sufficient capacity
+        }
+
+        // Get all reservations that overlap with the requested time range
+        const overlappingReservations = await prisma.reservation.findMany({
+            where: {
+                AND: [
+                    { timeStart: { lt: timeEnd } },
+                    { timeEnd: { gt: timeStart } },
+                ],
+            },
+            select: {
+                roomId: true,
+            },
+        });
+
+        const bookedRoomIds = new Set(overlappingReservations.map((res: { roomId: any; }) => res.roomId));
+
+        // Filter suitable rooms to exclude those that are already booked
+        const availableRooms = suitableRooms.filter((room: { roomId: any; }) => !bookedRoomIds.has(room.roomId));
+
+        console.log('Recommended rooms:', availableRooms);
+        return { success: true, rooms: availableRooms };
+    } catch (error) {
+        console.error('Error getting recommended rooms:', error);
+        return { success: false, error };
+    }
+}
 
 // ---------- RESERVATION Update ----------
 // placeholder
