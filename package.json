@@ -4,7 +4,7 @@
   "description": "SEN-201 Project Classroom Reservation",
   "main": "index.js",
   "dependencies": {
-    "@prisma/client": "^6.16.3",
+    "@prisma/client": "^6.18.0",
     "c12": "^3.1.0",
     "chokidar": "^4.0.3",
     "citty": "^0.1.6",
@@ -26,7 +26,6 @@
     "pathe": "^2.0.3",
     "perfect-debounce": "^1.0.0",
     "pkg-types": "^2.3.0",
-    "prisma": "^6.16.3",
     "pure-rand": "^6.1.0",
     "rc9": "^2.1.2",
     "readdirp": "^4.1.2",
@@ -49,7 +48,8 @@
   },
   "homepage": "https://github.com/Nunthatinnv/SEN201_ClassroomReservation#readme",
   "devDependencies": {
-    "@types/node": "^24.7.2",
+    "@types/node": "^24.9.1",
+    "prisma": "^6.18.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

@@ -4,13 +4,17 @@
   Description: Main reservation logics
     - Conflicts check
     - Recursively insert and edit reservations
-  Lasted Modify: 2025-10-14 23.08
+    
+  Modified by: Beam - Atchariyapat Sirijirakarnjareon (asiriji@cmkl.ac.th)
+  Fixed 'string | null' type error in checkConflicts by using non-null assertion.
+  Lasted Modify: 2025-10-27 08.55
 */
 
 import { randomUUID } from "crypto";
 import { deleteReservationBySeriesId, getReservationsByTimeRange } from "./reservationService";
 import { createReservationBySlotData } from "./reservationService";
-import type { Slot } from "../types";
+import { getRecommendedRooms } from "./reservationService";
+import type { Slot, Room } from "../types";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
 
@@ -45,6 +49,12 @@ function generateWeeklySlots(timeStart: Date, timeEnd: Date, rep: number): Slot[
   return slots;
 }
 
+// ---------- ROOM RECOMMENDATION HANDLER ----------
+export async function getRecommendedRoomsHandler(timeStart: Date, timeEnd: Date, numberOfStudents: number): Promise<
+    { success: true; rooms: Room[] } | { success: false; error: any }
+> {
+    return await getRecommendedRooms(timeStart, timeEnd, numberOfStudents);
+}
 
 // Check conflicts on given time slots
 async function checkConflicts(seriesId: string | null, roomId: string, slots: Slot[]): Promise<boolean> {
@@ -88,9 +98,21 @@ async function checkConflicts(seriesId: string | null, roomId: string, slots: Sl
 // ---------- Repeatation Reservation Logics ----------
 
 // Add a new reservation series to the database.
-export async function addReservation(roomId: string, timeStart: Date, timeEnd: Date, rep: number, competency: string): Promise<boolean> {
+export async function addReservation(roomId: string | null, timeStart: Date, timeEnd: Date, rep: number, competency: string, numberOfStudents: number): Promise<boolean> {
+  let finalRoomId = roomId;
+
+  if (!finalRoomId) {
+    const recommendedRoomsResult = await getRecommendedRoomsHandler(timeStart, timeEnd, numberOfStudents);
+    if (recommendedRoomsResult.success && recommendedRoomsResult.rooms.length > 0) {
+      finalRoomId = recommendedRoomsResult.rooms[0].roomId; // Select the first recommended room
+    } else {
+      console.error('No suitable rooms found or error during recommendation.');
+      return false; // No recommended room, cannot proceed
+    }
+  }
+
   const slots = generateWeeklySlots(timeStart, timeEnd, rep);
-  const isConflict = await checkConflicts(null, roomId, slots);
+  const isConflict = await checkConflicts(null, finalRoomId!, slots);
 
   if (isConflict) {
     return false; // slot(s) overlap, reservation fail
@@ -98,10 +120,11 @@ export async function addReservation(roomId: string, timeStart: Date, timeEnd: D
     const seriesId = randomUUID();
     const newSlotData = slots.map(slot => ({
       seriesId,
-      roomId,
+      roomId: finalRoomId as string,
       timeStart: slot.timeStart,
       timeEnd: slot.timeEnd,
       competency,
+      numberOfStudents
     }));
     try {
       // Insert slots into database
@@ -117,9 +140,21 @@ export async function addReservation(roomId: string, timeStart: Date, timeEnd: D
 
 
 // Edit an existing reservation series by seriesId.
-export async function editReservation(seriesId: string, roomId: string, timeStart: Date, timeEnd: Date, rep: number, competency: string): Promise<boolean> {
+export async function editReservation(seriesId: string, roomId: string | null, timeStart: Date, timeEnd: Date, rep: number, competency: string, numberOfStudents: number): Promise<boolean> {
+  let finalRoomId = roomId;
+
+  if (!finalRoomId) {
+    const recommendedRoomsResult = await getRecommendedRoomsHandler(timeStart, timeEnd, numberOfStudents);
+    if (recommendedRoomsResult.success && recommendedRoomsResult.rooms.length > 0) {
+      finalRoomId = recommendedRoomsResult.rooms[0].roomId; // Select the first recommended room
+    } else {
+      console.error('No suitable rooms found or error during recommendation.');
+      return false; // No recommended room, cannot proceed
+    }
+  }
+
   const slots = generateWeeklySlots(timeStart, timeEnd, rep);
-  const isConflict = await checkConflicts(seriesId, roomId, slots);
+  const isConflict = await checkConflicts(seriesId, finalRoomId!, slots);
 
   if (isConflict) {
     return false; // slot overlap, reservation fail
@@ -127,10 +162,11 @@ export async function editReservation(seriesId: string, roomId: string, timeStar
     // Insert slots into database
     const newSlotData = slots.map(slot => ({
       seriesId,
-      roomId,
+      roomId: finalRoomId as string,
       timeStart: slot.timeStart,
       timeEnd: slot.timeEnd,
       competency,
+      numberOfStudents
     }));
     try {
       // delete existing reservation series
